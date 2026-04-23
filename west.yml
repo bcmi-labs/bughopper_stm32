@@ -6,6 +6,9 @@
 # if you are in the zephyrproject directory or else things may break.
 
 manifest:
+  self:
+    path: app
+
   remotes:
     - name: zephyrproject-rtos
       url-base: https://github.com/zephyrproject-rtos
