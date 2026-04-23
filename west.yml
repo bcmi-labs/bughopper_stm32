@@ -17,19 +17,10 @@ manifest:
 
   projects:
     - name: zephyr
-      remote: arduino
+      remote: bcmi
       revision: desire4eu
       import:
         name-allowlist:
           - cmsis
           - cmsis_6
-          - littlefs
-          - tinycrypt
-          - mbedtls
-          - segger
-          - thrift
-          - mcuboot
-          - nanopb
-          - lvgl
-          - fatfs
 	  - hal_stm32
