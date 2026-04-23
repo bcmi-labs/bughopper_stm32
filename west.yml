@@ -6,9 +6,6 @@
 # if you are in the zephyrproject directory or else things may break.
 
 manifest:
-  self:
-    path: modules/lib/ArduinoCore-zephyr
-
   remotes:
     - name: zephyrproject-rtos
       url-base: https://github.com/zephyrproject-rtos
@@ -23,4 +20,4 @@ manifest:
         name-allowlist:
           - cmsis
           - cmsis_6
-	  - hal_stm32
+          - hal_stm32
