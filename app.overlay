@@ -1,0 +1,55 @@
+/*
+ * Copyright 2025 Google LLC
+ *
+ * Copyright (c) Arduino s.r.l. and/or its affiliated companies
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+&usart1 {
+	pinctrl-0 = <&usart1_tx_pa0 &usart1_rx_pa1>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	status = "okay";
+};
+
+&spi1 {
+	status = "disabled";
+};
+
+/ {
+	uart-bridge0 {
+		compatible = "zephyr,uart-bridge";
+		peers = <&cdc_acm_uart0 &usart1>;
+	};
+
+	zephyr,user {
+		cbus-gpios =
+			<&gpiob 0 GPIO_ACTIVE_HIGH>,
+			<&gpiob 1 GPIO_ACTIVE_HIGH>,
+			<&gpiob 3 GPIO_ACTIVE_HIGH>,
+			<&gpiob 4 GPIO_ACTIVE_HIGH>;
+	};
+
+	leds: leds {
+		compatible = "gpio-leds";
+
+		led_tx: led-tx {
+			gpios = <&gpioa 2 GPIO_ACTIVE_HIGH>;
+			label = "TX LED";
+		};
+		led_rx: led-rx {
+			gpios = <&gpiob 6 GPIO_ACTIVE_HIGH>;
+			label = "RX LED";
+		};
+	};
+
+	hid_dev_0: hid_dev_0 {
+		compatible = "zephyr,hid-device";
+		label = "HID0";
+		protocol-code = "none";
+		in-report-size = <64>;
+		in-polling-period-us = <1000>;
+		out-report-size = <64>;
+		out-polling-period-us = <1000>;
+	};
+};
