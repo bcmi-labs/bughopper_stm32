@@ -12,6 +12,6 @@ west init -m git@github.com:bcmi-labs/bughopper_stm32.git .
 west update
 west sdk install
 pip install -r zephyr/scripts/requirements.txt 
-west build --pristine -b desire4eui app
+west build --pristine -b desire4eu app
 
 
