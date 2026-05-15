@@ -20,6 +20,7 @@
 	uart-bridge0 {
 		compatible = "zephyr,uart-bridge";
 		peers = <&cdc_acm_uart0 &usart1>;
+		activity-leds = <&led_tx>, <&led_rx>;
 	};
 
 	zephyr,user {
