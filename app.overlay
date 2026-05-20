@@ -5,15 +5,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+&spi1 {
+	status = "disabled";
+};
+
 &usart1 {
 	pinctrl-0 = <&usart1_tx_pa0 &usart1_rx_pa1>;
 	pinctrl-names = "default";
 	current-speed = <115200>;
 	status = "okay";
-};
-
-&spi1 {
-	status = "disabled";
 };
 
 / {

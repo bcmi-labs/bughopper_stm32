@@ -14,6 +14,8 @@
 #include <zephyr/usb/class/usbd_hid.h>
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/flash.h>
+#include <zephyr/sys/reboot.h>
 
 #include <zephyr/usb/usb_device.h>
 #include <zephyr/usb/usbd.h>
@@ -65,6 +67,25 @@ static const struct gpio_dt_spec gpios[DT_PROP_LEN(DT_PATH(zephyr_user), cbus_gp
 	DT_PATH(zephyr_user), cbus_gpios, GPIO_DT_SPEC_GET_BY_IDX, (, ))
 };
 
+__ramfunc static inline void jump_to_rom_bootloader(void)
+{
+	const struct device *flash_device = DEVICE_DT_GET(DT_CHOSEN(zephyr_flash_controller));
+	if (!device_is_ready(flash_device)) {
+		printk("%s: device not ready.\n", flash_device->name);
+		return;
+	}
+
+	/* erase flash content */
+	flash_erase(flash_device, 0, 128);
+	sys_reboot(SYS_REBOOT_COLD);
+}
+
+#define CMD_GPIO_SET 			0x01
+#define CMD_I2C_MODE 			0x02
+#define CMD_SECONDARY_UART_MODE	0x03
+#define CMD_I2C_TRANSFER 		0x04
+#define CMD_REBOOT_BL	 		0xD1
+
 static int get_report_cb(const struct device *dev, const uint8_t type, const uint8_t id, const uint16_t len,
 			 uint8_t *const buf) {
     return 0;
@@ -73,15 +94,22 @@ static int get_report_cb(const struct device *dev, const uint8_t type, const uin
 static int set_report_cb(const struct device *dev, const uint8_t type, const uint8_t id, const uint16_t len,
 			 const uint8_t *const buf) {
 
-    LOG_INF("USB - Received Raw HID report of length %i", len);
-    LOG_HEXDUMP_DBG(buf, len, "USB - Received Raw HID report");
+	uint8_t cmd = buf[0];
 
-	for (unsigned int i = 0; i < ARRAY_SIZE(gpios); i++) {
-		if (gpios[i].port == NULL) {
-			continue;
+	switch (cmd)	{
+	case CMD_GPIO_SET:
+		for (unsigned int i = 0; i < ARRAY_SIZE(gpios); i++) {
+			if (gpios[i].port == NULL) {
+				continue;
+			}
+			(void)gpio_pin_set_dt(&gpios[i], buf[1] & BIT(i));
 		}
-
-		(void)gpio_pin_set_dt(&gpios[i], buf[0] & BIT(i));
+		break;
+	case CMD_REBOOT_BL:
+		jump_to_rom_bootloader();
+		break;
+	default:
+		break;
 	}
 
     return 0;
@@ -90,7 +118,6 @@ static int set_report_cb(const struct device *dev, const uint8_t type, const uin
 static void output_report(const struct device *dev, const uint16_t len,
 			     const uint8_t *const buf)
 {
-	LOG_HEXDUMP_DBG(buf, len, "o.r.");
 	set_report_cb(dev, HID_REPORT_TYPE_OUTPUT, 0U, len, buf);
 }
 
