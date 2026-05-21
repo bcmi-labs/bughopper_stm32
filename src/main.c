@@ -99,9 +99,10 @@ static int set_report_cb(const struct device *dev, const uint8_t type, const uin
 	switch (cmd)	{
 	case CMD_GPIO_SET:
 		for (unsigned int i = 0; i < ARRAY_SIZE(gpios); i++) {
-			if (gpios[i].port == NULL) {
+			if ((gpios[i].port == NULL) || ((buf[2] & BIT(i)) == 0)) {
 				continue;
 			}
+
 			(void)gpio_pin_set_dt(&gpios[i], buf[1] & BIT(i));
 		}
 		break;
