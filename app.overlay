@@ -16,6 +16,35 @@
 	status = "okay";
 };
 
+/* If in use, set PA5 to OUTPUT_HIGH as pullup */
+&i2c1 {
+	pinctrl-0 = <&i2c1_scl_pb8 &i2c1_sda_pb7>;
+	pinctrl-names = "default";
+	status = "okay";
+	zephyr,deferred-init;
+};
+
+/* If in use, set PA5 to INPUT */
+&usart2 {
+	pinctrl-0 = <&usart2_tx_pa4 &usart2_rx_pa3>;
+	pinctrl-names = "default";
+	status = "okay";
+	zephyr,deferred-init;
+};
+
+&zephyr_udc0 {
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+		label = "Linux console";
+	};
+
+	cdc_acm_uart1: cdc_acm_uart1 {
+		compatible = "zephyr,cdc-acm-uart";
+		label = "MCU debug";
+		zephyr,deferred-init;
+	};
+};
+
 / {
 	uart-bridge0 {
 		compatible = "zephyr,uart-bridge";
@@ -23,12 +52,29 @@
 		activity-leds = <&led_tx>, <&led_rx>;
 	};
 
+	uart-bridge1 {
+		compatible = "zephyr,uart-bridge";
+		peers = <&cdc_acm_uart1 &usart2>;
+		status = "okay";
+		zephyr,deferred-init;
+	};
+
+	chosen {
+		zephyr,i2c = &i2c1;
+	};
+
+	aliases {
+		led0 = &user_led;
+	};
+
 	zephyr,user {
 		cbus-gpios =
 			<&gpiob 0 GPIO_ACTIVE_HIGH>,
 			<&gpiob 1 GPIO_ACTIVE_HIGH>,
 			<&gpiob 3 GPIO_ACTIVE_HIGH>,
-			<&gpiob 4 GPIO_ACTIVE_HIGH>;
+			<&gpiob 4 GPIO_ACTIVE_HIGH>,
+			<&gpiob 5 GPIO_ACTIVE_HIGH>;
+		i2c-pullup-gpios = <&gpioa 5 GPIO_ACTIVE_HIGH>;
 	};
 
 	leds: leds {
@@ -42,6 +88,11 @@
 			gpios = <&gpiob 6 GPIO_ACTIVE_HIGH>;
 			label = "RX LED";
 		};
+		user_led: user-led {
+			gpios = <&gpioa 13 GPIO_ACTIVE_HIGH>;
+			label = "User LED";
+		};
+
 	};
 
 	hid_dev_0: hid_dev_0 {

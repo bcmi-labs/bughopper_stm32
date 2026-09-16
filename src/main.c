@@ -14,6 +14,8 @@
 #include <zephyr/usb/class/usbd_hid.h>
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/led.h>
+#include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/flash.h>
 #include <zephyr/sys/reboot.h>
 
@@ -21,8 +23,6 @@
 #include <zephyr/usb/usbd.h>
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cdc_acm_bridge, LOG_LEVEL_INF);
-
-const struct device *const uart_dev = DEVICE_DT_GET_ONE(zephyr_cdc_acm_uart);
 
 static struct usbd_context *sample_usbd;
 
@@ -61,11 +61,15 @@ static void sample_msg_cb(struct usbd_context *const ctx, const struct usbd_msg 
 	}
 }
 
-
 static const struct gpio_dt_spec gpios[DT_PROP_LEN(DT_PATH(zephyr_user), cbus_gpios)] = {
 	DT_FOREACH_PROP_ELEM_SEP(
 	DT_PATH(zephyr_user), cbus_gpios, GPIO_DT_SPEC_GET_BY_IDX, (, ))
 };
+
+static void led_set(uint8_t state) {
+	static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
+	gpio_pin_set_dt(&led, state);
+}
 
 __ramfunc static inline void jump_to_rom_bootloader(void)
 {
@@ -83,18 +87,35 @@ __ramfunc static inline void jump_to_rom_bootloader(void)
 #define CMD_GPIO_SET 			0x01
 #define CMD_I2C_MODE 			0x02
 #define CMD_SECONDARY_UART_MODE	0x03
-#define CMD_I2C_TRANSFER 		0x04
+#define CMD_I2C_READ 			0x04
+#define CMD_I2C_WRITE 			0x05
+#define CMD_USER_LED	 		0x06
 #define CMD_REBOOT_BL	 		0xD1
+
+static uint8_t get_report_buf[256];
 
 static int get_report_cb(const struct device *dev, const uint8_t type, const uint8_t id, const uint16_t len,
 			 uint8_t *const buf) {
-    return 0;
+
+	memcpy(buf, get_report_buf, len);
+	return 0;
 }
+
+const struct device *i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c1));
+
+static const struct gpio_dt_spec pullup_gpios[DT_PROP_LEN(DT_PATH(zephyr_user), i2c_pullup_gpios)] = {
+	DT_FOREACH_PROP_ELEM_SEP(
+	DT_PATH(zephyr_user), i2c_pullup_gpios, GPIO_DT_SPEC_GET_BY_IDX, (, ))
+};
 
 static int set_report_cb(const struct device *dev, const uint8_t type, const uint8_t id, const uint16_t len,
 			 const uint8_t *const buf) {
 
 	uint8_t cmd = buf[0];
+
+	// Only valid for I2C read and write commands
+	uint8_t address = buf[1];
+	uint8_t length = buf[2];
 
 	switch (cmd)	{
 	case CMD_GPIO_SET:
@@ -108,6 +129,34 @@ static int set_report_cb(const struct device *dev, const uint8_t type, const uin
 		break;
 	case CMD_REBOOT_BL:
 		jump_to_rom_bootloader();
+		break;
+	case CMD_I2C_MODE:
+		// set PA5 as OUTPUT_HIGH
+		// enable device i2c1
+		gpio_pin_configure_dt(&pullup_gpios[0], GPIO_OUTPUT_HIGH);
+		device_init(i2c_dev);
+		break;
+	case CMD_SECONDARY_UART_MODE:
+		// set PA5 as INPUT
+		gpio_pin_configure_dt(&pullup_gpios[0], GPIO_INPUT);
+		// enable device usart2, cdc_acm_uart1 and uart_bridges[1]
+		device_init(DEVICE_DT_GET(DT_NODELABEL(usart2)));
+		device_init(DEVICE_DT_GET(DT_NODELABEL(cdc_acm_uart1)));
+		device_init(uart_bridges[1]);
+		// restart USB stack
+		usbd_disable(sample_usbd);
+		usbd_enable(sample_usbd);
+		break;
+	case CMD_I2C_READ:
+		// execute a read on specified address, populate get_report buf with the read data
+		i2c_read(i2c_dev, get_report_buf, length, address);
+		break;
+	case CMD_I2C_WRITE:
+		// execute a write on specified address
+		i2c_write(i2c_dev, &buf[3], length, address);
+		break;
+	case CMD_USER_LED:
+		led_set(buf[1]);
 		break;
 	default:
 		break;
