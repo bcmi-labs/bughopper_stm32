@@ -5,8 +5,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <sample_usbd.h>
-
 #include <stdio.h>
 #include <string.h>
 #include <zephyr/device.h>
@@ -24,7 +22,24 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cdc_acm_bridge, LOG_LEVEL_INF);
 
-static struct usbd_context *sample_usbd;
+struct usbd_context *usbd_init_device(struct usbd_context *ctx, usbd_msg_cb_t msg_cb, const char *const blocklist[]);
+
+static const char *const blocklist_dual_cdc[] = {
+	"dfu_dfu",
+};
+
+static const char *const blocklist_std[] = {
+	"dfu_dfu",
+	"cdc_acm_1",
+};
+
+USBD_DEVICE_DEFINE(normal_usbd,
+		   DEVICE_DT_GET(DT_NODELABEL(zephyr_udc0)),
+		   CONFIG_SAMPLE_USBD_VID, CONFIG_SAMPLE_USBD_PID);
+
+USBD_DEVICE_DEFINE(dual_cdc_usbd,
+		   DEVICE_DT_GET(DT_NODELABEL(zephyr_udc0)),
+		   CONFIG_SAMPLE_USBD_VID, CONFIG_SAMPLE_USBD_PID);
 
 #define DEVICE_DT_GET_COMMA(node_id) DEVICE_DT_GET(node_id),
 
@@ -141,11 +156,12 @@ static int set_report_cb(const struct device *dev, const uint8_t type, const uin
 		gpio_pin_configure_dt(&pullup_gpios[0], GPIO_INPUT);
 		// enable device usart2, cdc_acm_uart1 and uart_bridges[1]
 		device_init(DEVICE_DT_GET(DT_NODELABEL(usart2)));
-		device_init(DEVICE_DT_GET(DT_NODELABEL(cdc_acm_uart1)));
 		device_init(uart_bridges[1]);
 		// restart USB stack
-		usbd_disable(sample_usbd);
-		usbd_enable(sample_usbd);
+		usbd_disable(&normal_usbd);
+		usbd_shutdown(&normal_usbd);
+		struct usbd_context *dual_cdc_ctx = usbd_init_device(&dual_cdc_usbd, sample_msg_cb, blocklist_dual_cdc);
+		usbd_enable(&dual_cdc_usbd);
 		break;
 	case CMD_I2C_READ:
 		// execute a read on specified address, populate get_report buf with the read data
@@ -245,14 +261,10 @@ int main(void)
 		}
 	}
 
-	sample_usbd = sample_usbd_init_device(sample_msg_cb);
-	if (sample_usbd == NULL) {
-		LOG_ERR("Failed to initialize USB device");
-		return -ENODEV;
-	}
+	usbd_init_device(&normal_usbd, sample_msg_cb, blocklist_std);
 
-	if (!usbd_can_detect_vbus(sample_usbd)) {
-		err = usbd_enable(sample_usbd);
+	if (!usbd_can_detect_vbus(&normal_usbd)) {
+		err = usbd_enable(&normal_usbd);
 		if (err) {
 			LOG_ERR("Failed to enable device support");
 			return err;
