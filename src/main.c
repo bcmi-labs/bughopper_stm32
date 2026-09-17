@@ -107,12 +107,11 @@ __ramfunc static inline void jump_to_rom_bootloader(void)
 #define CMD_USER_LED	 		0x06
 #define CMD_REBOOT_BL	 		0xD1
 
-static uint8_t get_report_buf[256];
+K_MSGQ_DEFINE(i2c_msgq, 256, 2, 1);
 
 static int get_report_cb(const struct device *dev, const uint8_t type, const uint8_t id, const uint16_t len,
 			 uint8_t *const buf) {
 
-	memcpy(buf, get_report_buf, len);
 	return 0;
 }
 
@@ -131,6 +130,7 @@ static int set_report_cb(const struct device *dev, const uint8_t type, const uin
 	// Only valid for I2C read and write commands
 	uint8_t address = buf[1];
 	uint8_t length = buf[2];
+	uint8_t tmp[length];
 
 	switch (cmd)	{
 	case CMD_GPIO_SET:
@@ -165,7 +165,9 @@ static int set_report_cb(const struct device *dev, const uint8_t type, const uin
 		break;
 	case CMD_I2C_READ:
 		// execute a read on specified address, populate get_report buf with the read data
-		i2c_read(i2c_dev, get_report_buf, length, address);
+		i2c_read(i2c_dev, &tmp[1], length, address);
+		tmp[0]= length;
+		k_msgq_put(&i2c_msgq, tmp, K_NO_WAIT);
 		break;
 	case CMD_I2C_WRITE:
 		// execute a write on specified address
@@ -273,7 +275,11 @@ int main(void)
 
 	LOG_INF("USB device support enabled");
 
-	k_sleep(K_FOREVER);
+	while (true) {
+		UDC_STATIC_BUF_DEFINE(report, 256);
+		k_msgq_get(&i2c_msgq, &report, K_FOREVER);
+		hid_device_submit_report(hid_dev, report[0], &report[1]);
+	}
 
 	return 0;
 }
