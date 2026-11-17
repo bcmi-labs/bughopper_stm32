@@ -12,13 +12,13 @@ manifest:
   remotes:
     - name: zephyrproject-rtos
       url-base: https://github.com/zephyrproject-rtos
-    - name: bcmi
-      url-base: git@github.com:bcmi-labs
+    - name: arduino
+      url-base: https://github.com/arduino
 
   projects:
     - name: zephyr
-      remote: bcmi
-      revision: desire4eu
+      remote: arduino
+      revision: bughopper
       import:
         name-allowlist:
           - cmsis
